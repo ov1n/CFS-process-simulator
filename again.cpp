@@ -1,5 +1,6 @@
 #include <iostream>
 #include<vector>
+#include<fstream>
 
 using namespace std;
 
@@ -228,6 +229,7 @@ public:
 	int fair_clock;					//System wide run CPU clock
 	int process_id;					//Variable to give each process a unique ID
 	int process_count;				//no of processes, count decrements each time a process exits
+	vector<Node *> table;
 	
 	int enter_processes(){
 		cout<<"COMPLETE FAIR SCHEDULER SYSTEM"<<endl;
@@ -237,6 +239,7 @@ public:
 		
 		int scheduler[n][2];											//Create an array to contain the processes
 		cout<<endl<<"Enter time quantum and weight of processes to be inserted: "<<endl;
+		cout<<"lesser the number higher the priority(>0)"<<endl;
 		int temp1;														//Temporary variable to store time quantum
 		int temp2;
 		
@@ -257,6 +260,36 @@ public:
 		}
 		
 		return n;					//Returns n to be used later for deletion and controling the scheduling process
+	}
+	
+	void finalize(){
+		
+		ofstream outfile;
+	
+		outfile.open("process_report.txt",ios_base::app);
+		cout<<"FAIR CLOCK TIME "<<fair_clock<<endl;
+		outfile<<"FAIR CLOCK TIME "<<fair_clock<<endl;
+		outfile<<"-----------------"<<endl;
+	}
+	
+	void show_entered(){
+		
+		ofstream outfile;
+		outfile.open("process_report.txt",std::ios_base::app);
+		
+		outfile<<"CFS SCHEDULING SYSTEM :"<<endl;
+		outfile<<"-----------------------"<<endl;
+		
+		cout<<"INSERTED PROCESSES :"<<endl;
+		outfile<<"INSERTED PROCESSES :"<<endl;
+		
+		
+		for(int i=0;i<table.size();i++){
+			cout<<"PROCESS ID= "<<table[i]->p_id<<" DURATION = "<<table[i]->data<<" PRIORITY ="<<table[i]->weight<<endl;
+			outfile<<"PROCESS ID= "<<table[i]->p_id<<" DURATION = "<<table[i]->data<<" PRIORITY ="<<table[i]->weight<<endl;
+		}
+		
+		outfile<<endl;
 	}
 	// find the node with the minimum key
 	NodePtr minimum(NodePtr node) {
@@ -315,16 +348,20 @@ public:
 		node->weight = weight;
 		node->p_id = process_id;
 		node->curr_time=0;
+		node->wait_runtime=weight;
 		node->left = TNULL;
 		node->right = TNULL;
 		node->color = 1; // new node must be red
+		
+		//Insert into vector
+		table.push_back(node);
 
 		NodePtr y = NULL;
 		NodePtr x = this->root;
 
 		while (x != TNULL) {
 			y = x;
-			if (node->curr_time < x->curr_time) {
+			if (node->wait_runtime < x->wait_runtime) {
 				x = x->left;
 			} else {
 				x = x->right;
@@ -335,7 +372,7 @@ public:
 		node->parent = y;
 		if (y == NULL) {
 			root = node;
-		} else if (node->curr_time < y->curr_time) {
+		} else if (node->wait_runtime < y->wait_runtime) {
 			y->left = node;
 		} else {
 			y->right = node;
@@ -361,18 +398,24 @@ public:
 		node->parent = NULL;
 		//node->data = 1; // CHANGE TEST VALUE
 		node->curr_time++;
+		node->wait_runtime+=node->weight;
 		node->left = TNULL;
 		node->right = TNULL;
 		node->color = 1; // new node must be red
 		
 		//cout<<"process time"<<node->curr_time<<endl;
 		//cout<<"PROCESS COUNT"<<process_count<<endl;
+		ofstream outfile;
+		outfile.open("process_report.txt",std::ios_base::app);		//2nd parameter for appending
 		
-		if(node->curr_time==node->data){
+		if(node->curr_time>=node->data){
 			cout<<"\tPROCESS WITH ID "<<node->p_id<<" COMPLETED"<<endl;
+			outfile<<"\tPROCESS WITH ID "<<node->p_id<<" COMPLETED"<<endl;
 			process_count--;
 			if(process_count<=0){
 				cout<<endl<<"ALL PROCESSES SCHEDULED AND COMPLETED"<<endl;
+				outfile<<endl<<"ALL PROCESSES SCHEDULED AND COMPLETED"<<endl;
+				outfile<<endl;
 				return 0;
 			}else{
 				return 1;
@@ -384,7 +427,7 @@ public:
 
 		while (x != TNULL) {
 			y = x;
-			if (node->curr_time < x->curr_time) {
+			if (node->wait_runtime < x->wait_runtime) {
 				x = x->left;
 			} else {
 				x = x->right;
@@ -395,7 +438,7 @@ public:
 		node->parent = y;
 		if (y == NULL) {
 			root = node;
-		} else if (node->curr_time < y->curr_time) {
+		} else if (node->wait_runtime < y->wait_runtime) {
 			y->left = node;
 		} else {
 			y->right = node;
@@ -426,7 +469,12 @@ public:
 		//cout<<"data of min"<<x->data<<endl;
 		Node *y=deleteNodeHelper(x);
 		//cout<<"data of deleted"<<y->data<<endl;
+		
+		ofstream outfile;
+		outfile.open("process_report.txt",std::ios_base::app);
+		
 		cout<<endl<<"T="<<fair_clock<<"\t"<<"RUNNING PROCESS WITH ID "<<y->p_id<<endl;
+		outfile<<"T="<<fair_clock<<"\t"<<"RUNNING PROCESS WITH ID "<<y->p_id<<endl;
 		return y;
 	}
 
@@ -441,17 +489,28 @@ public:
 
 int main() {
 	RBTree bst;
+	
+	//FILE HANDLING
+	ofstream outfile;
+	outfile.open("process_report.txt");
 	bst.process_count=bst.enter_processes();			//Enter time quantums of processes seperated by space returns total no of processes entered
+	bst.show_entered();
 	//cout<<"count"<<count<<endl;
+	
 	bst.prettyPrint();
 	int flag=1;											//Flag to keep scheduler running, controlled by insert function inside
 	while(flag){
+		
 		Node *x=bst.deleteNode();
+		
 		bst.prettyPrint();
 		flag=bst.insert(x);
 		bst.prettyPrint();
 	}
-	cout<<"FAIR CLOCK TIME "<<bst.fair_clock<<endl;
+	
+	bst.finalize();
+	
+	outfile.close();
 	
 	return 0;
 }
