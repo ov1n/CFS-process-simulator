@@ -1,37 +1,46 @@
 #include <iostream>
 #include<vector>
 #include<fstream>
+#include<math.h>
 
 using namespace std;
 
-// data structure that represents a node in the tree
-struct Node {
+// data structure that represents a process in the tree
+struct prc {
 	int data; // holds the key
 	int weight;	//the weight of the process
 	int p_id;		//process id of current process
-	int curr_time; //holds current time
-	int wait_runtime; //Per process runtime
-	Node *parent; // pointer to the parent
-	Node *left; // pointer to left child
-	Node *right; // pointer to right child
-	int color; // 1 -> Red, 0 -> Black
+	float curr_time; //holds current time
+	float wait_runtime; //Per process runtime
+	prc *parent; // pointer to the parent
+	prc *left; // pointer to left child
+	prc *right; // pointer to right child
+	int color; // 1 is red, 0 is Black
 };
 
-typedef Node *NodePtr;
+struct processor{
+	
+	int proc_id;
+	int capacity;
+	
+};
 
-// class RBTree implements the operations in Red Black Tree
+typedef prc *prcPtr;
+
+// An RBTree is made to implement the operations for processes
 class RBTree {
+	
 private:
-	NodePtr root;
-	NodePtr TNULL;
+	prcPtr root;
+	prcPtr TNULL;
 	// fix the rb tree modified by the delete operation
-	void fixDelete(NodePtr x) {
-		NodePtr s;
+	void fixDelete(prcPtr x) {
+		prcPtr s;
 		while (x != root && x->color == 0) {
-			if (x == x->parent->left) {
+			if (x == x->parent->left) {			//Check if it's the left tree
 				s = x->parent->right;
 				if (s->color == 1) {
-					// case 3.1
+					// case 1 of Double black 
 					s->color = 0;
 					x->parent->color = 1;
 					leftRotate(x->parent);
@@ -94,7 +103,7 @@ private:
 	}
 
 
-	void rbTransplant(NodePtr u, NodePtr v){
+	void rbTransplant(prcPtr u, prcPtr v){
 		if (u->parent == NULL) {
 			root = v;
 		} else if (u == u->parent->left){
@@ -105,10 +114,10 @@ private:
 		v->parent = u->parent;
 	}
 
-	Node *deleteNodeHelper(NodePtr node) {
-		// find the node containing key
-		NodePtr z = node;
-		NodePtr x, y;
+	prc *deleteprcHelper(prcPtr p) {
+		
+		prcPtr z = p;
+		prcPtr x, y;
 
 		y = z;
 		int y_original_color = y->color;
@@ -140,13 +149,22 @@ private:
 			fixDelete(x);
 		}
 		//delete z;
-		fair_clock++;
+		if(pro_cycle>=total_duration){
+			fair_clock++;						//If the process quantum is very large
+		}
+		else if(p->data-p->curr_time>slice){
+			fair_clock+=slice;					//if remaining time is greater than a slice
+		}
+		else{
+			fair_clock+=p->data-p->curr_time;	//if remaining time of process is less than a slice
+		}
+		
 		return z;
 	}
 	
 	// fix the red-black tree
-	void fixInsert(NodePtr k){
-		NodePtr u;
+	void fixInsert(prcPtr k){
+		prcPtr u;
 		while (k->parent->color == 1) {
 			if (k->parent == k->parent->parent->right) {
 				u = k->parent->parent->left; // uncle
@@ -195,60 +213,50 @@ private:
 		root->color = 0;
 	}
 
-	void printHelper(NodePtr root, string indent, bool last) {
-		// print the tree structure on the screen
-	   	if (root != TNULL) {
-		   /*cout<<indent;
-		   if (last) {
-		      cout<<"R----";
-		      indent += "     ";
-		   } else {
-		      cout<<"L----";
-		      indent += "|    ";
-		   }
-            
-           string sColor = root->color?"RED":"BLACK";
-		   //cout<</*root->data<<"("<<sColor<<")"<<"p_id :"<<root->p_id<<" time qun :"<<root->data<<" curr time:"<<root->curr_time<<endl;*/
-		   printHelper(root->left, indent, false);
-		   printHelper(root->right, indent, true);
-		}
-		// cout<<root->left->data<<endl;
-	}
-
 public:
 	RBTree() {
 		process_id=-1;
 		fair_clock=0;		//Initialize clock
-		TNULL = new Node;
+		TNULL = new prc;
 		TNULL->color = 0;
 		TNULL->left = NULL;
 		TNULL->right = NULL;
 		root = TNULL;
 	}
 	
-	int fair_clock;					//System wide run CPU clock
-	int process_id;					//Variable to give each process a unique ID
-	int process_count;				//no of processes, count decrements each time a process exits
-	vector<Node *> table;
+	float fair_clock;						//System wide run CPU clock
+	int process_id;							//Variable to give each process a unique ID
+	int process_count;						//no of processes, count decrements each time a process exits
+	float pro_cycle;							//The cycle of a the process cycle
+	float total_duration;						//Total duration of all processes
+	float total_priorities;					//Total priorities of all processes
+	float slice;							//The time slice for each process run to be incremented
+	
+	vector<prc *> table;					//vector containing all processes
 	
 	int enter_processes(){
 		cout<<"COMPLETE FAIR SCHEDULER SYSTEM"<<endl;
 		int n;
 		cout<<"Enter number of processes to be inserted: "<<endl;
 		cin>>n;
+		cout<<"Enter time quantum of processor: "<<endl;
+		cin>>pro_cycle;
 		
-		int scheduler[n][2];											//Create an array to contain the processes
-		cout<<endl<<"Enter time quantum and weight of processes to be inserted: "<<endl;
+		float scheduler[n][2];											//Create an array to contain the processes
+		cout<<endl<<"Enter priority and time quantum of processes to be inserted: "<<endl;
 		cout<<"lesser the number higher the priority(>0)"<<endl;
-		int temp1;														//Temporary variable to store time quantum
-		int temp2;
-		
+		float getPriority;														//Temporary variable to store time quantum
+		float getBursttime;
+		total_duration=0;
+		total_priorities=0;
 		for(int i=0;i<n;i++){
-			cin>>temp1;
-			cin>>temp2;
+			cin>>getPriority;
+			cin>>getBursttime;
 			//insert time quantums into an array;
-			scheduler[i][0]=temp1;
-			scheduler[i][1]=temp2;
+			scheduler[i][0]=getBursttime;				//Priority
+			scheduler[i][1]=getPriority;				//Time duration
+			total_duration+=scheduler[i][0];			//Calculate total durations
+			total_priorities+=scheduler[i][1];			//Calculate total priorities
 			
 		}
 		
@@ -257,6 +265,18 @@ public:
 			//Make initial RBT
 			insert(scheduler[i][0],scheduler[i][1]);
 			
+		}
+		
+		if(total_duration<=pro_cycle){
+			cout<<"OK BOOM"<<endl;
+		}else{
+			
+			cout<<"pro_cycle"<<pro_cycle<<endl;
+			cout<<"total priorities"<<total_priorities<<endl;
+			cout<<"total time"<<total_duration<<endl;
+			slice=pro_cycle/total_priorities;
+			printf("%f\n",slice);
+			//cout<<"slice"<<slice<<endl;
 		}
 		
 		return n;					//Returns n to be used later for deletion and controling the scheduling process
@@ -280,6 +300,9 @@ public:
 		outfile<<"CFS SCHEDULING SYSTEM :"<<endl;
 		outfile<<"-----------------------"<<endl;
 		
+		cout<<"FAIR CLOCK TIME "<<fair_clock<<endl;
+		outfile<<"FAIR CLOCK TIME "<<fair_clock<<endl;
+		
 		cout<<"INSERTED PROCESSES :"<<endl;
 		outfile<<"INSERTED PROCESSES :"<<endl;
 		
@@ -291,17 +314,17 @@ public:
 		
 		outfile<<endl;
 	}
-	// find the node with the minimum key
-	NodePtr minimum(NodePtr node) {
-		while (node->left != TNULL) {
-			node = node->left;
+	// find the leftmost process
+	prcPtr minimum(prcPtr p) {
+		while (p->left != TNULL) {
+			p = p->left;
 		}
-		return node;
+		return p;
 	}
 
-	// rotate left at node x
-	void leftRotate(NodePtr x) {
-		NodePtr y = x->right;
+	// rotate left 
+	void leftRotate(prcPtr x) {
+		prcPtr y = x->right;
 		x->right = y->left;
 		if (y->left != TNULL) {
 			y->left->parent = x;
@@ -318,9 +341,9 @@ public:
 		x->parent = y;
 	}
 
-	// rotate right at node x
-	void rightRotate(NodePtr x) {
-		NodePtr y = x->left;
+	// rotate right
+	void rightRotate(prcPtr x) {
+		prcPtr y = x->left;
 		x->left = y->right;
 		if (y->right != TNULL) {
 			y->right->parent = x;
@@ -342,26 +365,26 @@ public:
 	void insert(int key,int weight) {
 		// Ordinary Binary Search Insertion
 		process_id++;
-		NodePtr node = new Node;
-		node->parent = NULL;
-		node->data = key;
-		node->weight = weight;
-		node->p_id = process_id;
-		node->curr_time=0;
-		node->wait_runtime=weight;
-		node->left = TNULL;
-		node->right = TNULL;
-		node->color = 1; // new node must be red
+		prcPtr p = new prc;
+		p->parent = NULL;
+		p->data = key;
+		p->weight = weight;
+		p->p_id = process_id;
+		p->curr_time=0;
+		p->wait_runtime=weight;
+		p->left = TNULL;
+		p->right = TNULL;
+		p->color = 1; // new p of an RBT must be red
 		
 		//Insert into vector
-		table.push_back(node);
+		table.push_back(p);
 
-		NodePtr y = NULL;
-		NodePtr x = this->root;
+		prcPtr y = NULL;
+		prcPtr x = this->root;
 
 		while (x != TNULL) {
 			y = x;
-			if (node->wait_runtime < x->wait_runtime) {
+			if (p->wait_runtime < x->wait_runtime) {
 				x = x->left;
 			} else {
 				x = x->right;
@@ -369,50 +392,64 @@ public:
 		}
 
 		// y is parent of x
-		node->parent = y;
+		p->parent = y;
 		if (y == NULL) {
-			root = node;
-		} else if (node->wait_runtime < y->wait_runtime) {
-			y->left = node;
+			root = p;
+		} else if (p->wait_runtime < y->wait_runtime) {
+			y->left = p;
 		} else {
-			y->right = node;
+			y->right = p;
 		}
 
-		// if new node is a root node, simply return
-		if (node->parent == NULL){
-			node->color = 0;
+		// if new p is a root p, simply return
+		if (p->parent == NULL){
+			p->color = 0;
 			return;
 		}
 
 		// if the grandparent is null, simply return
-		if (node->parent->parent == NULL) {
+		if (p->parent->parent == NULL) {
 			return;
 		}
 		
 		// Fix the tree
-		fixInsert(node);
+		fixInsert(p);
 	}
 	
-	int insert(Node *node) {
+	int insert(prc *p) {
 		
-		node->parent = NULL;
-		//node->data = 1; // CHANGE TEST VALUE
-		node->curr_time++;
-		node->wait_runtime+=node->weight;
-		node->left = TNULL;
-		node->right = TNULL;
-		node->color = 1; // new node must be red
+		p->parent = NULL;
+		//p->data = 1; // CHANGE TEST VALUE
+		//IF CONDITION FOR CURRENT TIME
+
+		if(pro_cycle>=total_duration){
+			p->curr_time++;
+		}else if(p->data-p->curr_time<slice){
+			p->curr_time=p->data;
+		}
+		else{
+			p->curr_time+=slice;
+		}
+		p->wait_runtime+=p->weight;
+		p->left = TNULL;
+		p->right = TNULL;
+		p->color = 1; // new p must be red
 		
-		//cout<<"process time"<<node->curr_time<<endl;
+		//cout<<"process time"<<p->curr_time<<endl;
 		//cout<<"PROCESS COUNT"<<process_count<<endl;
 		ofstream outfile;
 		outfile.open("process_report.txt",std::ios_base::app);		//2nd parameter for appending
 		
-		if(node->curr_time>=node->data){
-			cout<<"\tPROCESS WITH ID "<<node->p_id<<" COMPLETED"<<endl;
-			outfile<<"\tPROCESS WITH ID "<<node->p_id<<" COMPLETED"<<endl;
+		if(p->curr_time>=p->data){
+			cout<<"\tPROCESS WITH ID "<<p->p_id<<" COMPLETED"<<endl;
+			outfile<<"\tPROCESS WITH ID "<<p->p_id<<" COMPLETED"<<endl;
 			process_count--;
+			
+			slice=pro_cycle/(total_priorities-(4-p->weight));
 			if(process_count<=0){
+				cout<<endl<<"CONTEXT SWITCH OVERHEAD= "<<fair_clock-total_duration<<endl;
+				outfile<<endl<<"CONTEXT SWITCH OVERHEAD= "<<fair_clock-total_duration<<endl;
+				
 				cout<<endl<<"ALL PROCESSES SCHEDULED AND COMPLETED"<<endl;
 				outfile<<endl<<"ALL PROCESSES SCHEDULED AND COMPLETED"<<endl;
 				outfile<<endl;
@@ -422,12 +459,12 @@ public:
 			}	
 		}
 
-		NodePtr y = NULL;
-		NodePtr x = this->root;
+		prcPtr y = NULL;
+		prcPtr x = this->root;
 
 		while (x != TNULL) {
 			y = x;
-			if (node->wait_runtime < x->wait_runtime) {
+			if (p->wait_runtime < x->wait_runtime) {
 				x = x->left;
 			} else {
 				x = x->right;
@@ -435,39 +472,39 @@ public:
 		}
 
 		// y is parent of x
-		node->parent = y;
+		p->parent = y;
 		if (y == NULL) {
-			root = node;
-		} else if (node->wait_runtime < y->wait_runtime) {
-			y->left = node;
+			root = p;
+		} else if (p->wait_runtime < y->wait_runtime) {
+			y->left = p;
 		} else {
-			y->right = node;
+			y->right = p;
 		}
 
-		// if new node is a root node, simply return
-		if (node->parent == NULL){
-			node->color = 0;
+		// if new p is a root p, simply return
+		if (p->parent == NULL){
+			p->color = 0;
 			return 1;
 		}
 
 		// if the grandparent is null, simply return
-		if (node->parent->parent == NULL) {
+		if (p->parent->parent == NULL) {
 			return 1;
 		}
 
 		// Fix the tree
-		fixInsert(node);
+		fixInsert(p);
 	}
 
-	NodePtr getRoot(){
+	prcPtr getRoot(){
 		return this->root;
 	}
 
-	// delete the node from the tree
-	Node *deleteNode() {
-		Node *x=minimum(root);
+	// delete the p from the tree
+	prc *deleteprc() {
+		prc *x=minimum(root);					//Get the leftmost node of the RBT 
 		//cout<<"data of min"<<x->data<<endl;
-		Node *y=deleteNodeHelper(x);
+		prc *y=deleteprcHelper(x);
 		//cout<<"data of deleted"<<y->data<<endl;
 		
 		ofstream outfile;
@@ -478,13 +515,6 @@ public:
 		return y;
 	}
 
-	// print the tree structure on the screen
-	void prettyPrint() {
-	    if (root) {
-    		printHelper(this->root, "", true);
-	    }
-	}
-
 };
 
 int main() {
@@ -493,23 +523,27 @@ int main() {
 	//FILE HANDLING
 	ofstream outfile;
 	outfile.open("process_report.txt");
+	
 	bst.process_count=bst.enter_processes();			//Enter time quantums of processes seperated by space returns total no of processes entered
 	bst.show_entered();
-	//cout<<"count"<<count<<endl;
 	
-	bst.prettyPrint();
 	int flag=1;											//Flag to keep scheduler running, controlled by insert function inside
 	while(flag){
 		
-		Node *x=bst.deleteNode();
+		prc *x=bst.deleteprc();
 		
-		bst.prettyPrint();
 		flag=bst.insert(x);
-		bst.prettyPrint();
 	}
 	
 	bst.finalize();
 	
+	cout<<"Do you wish to extend the system to handle symmetrical multiprocessing?"<<endl<<"enter Y or N"<<endl;
+	char input;
+	cin>>input;
+	if(input=='Y'){
+		cout<<"yes";
+	}
+	//bst.extend_symmetrical()
 	outfile.close();
 	
 	return 0;
